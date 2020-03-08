@@ -31,10 +31,11 @@ package org.firstinspires.ftc.teamcode.Red;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.Hardware;
+import org.firstinspires.ftc.teamcode.MecanumCalculator;
+import org.firstinspires.ftc.teamcode.MecanumCalculator;
 
 import java.util.concurrent.TimeUnit;
 
@@ -52,9 +53,9 @@ import java.util.concurrent.TimeUnit;
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Found Red Rot", group="Red")
+@Autonomous(name="Strafe Left", group="Red")
 
-public class FoundRedFix extends OpMode
+public class Strafe extends OpMode
 {// Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
     private Hardware robot = new Hardware();
@@ -62,6 +63,8 @@ public class FoundRedFix extends OpMode
     int delay = 0;
     int stage = 1;
     double timeOfNewStage;
+    MecanumCalculator calculator;
+    double xpos = 0, ypos = 0;
     //private DcMotor leftFront, leftBack, rightFront, rightBack, slide, claw, arm;
     //SLIDE MOTOR
     // 1120 Ticks/rev
@@ -89,7 +92,7 @@ public class FoundRedFix extends OpMode
     public void init() {
         robot.init( hardwareMap, telemetry );
         telemetry.addData("Status", "Initialized" );
-
+        calculator = new MecanumCalculator( 0.0002, -0.0002, -0.075 );
 
         // create a sound parameter that holds the desired player parameters.
 
@@ -124,6 +127,7 @@ public class FoundRedFix extends OpMode
     @Override
     public void start() {
         runtime.reset();
+        calculator.setTarget( -( 24 / ( 3 * Math.PI ) )*8096,0,0 );
 
     }
     /*
@@ -131,67 +135,24 @@ public class FoundRedFix extends OpMode
      */
     @Override
     public void loop() {
-        // First, rotate the  robot to be parallel to the face of the block
 
+        double[] error = calculator.getError( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+        // First, rotate the  robot to be parallel to the face of the block
+        double[] out = calculator.getOutput( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+        boolean[] dones = calculator.getDoneIndiv( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+        boolean totalDone = calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
         double t = runtime.time(TimeUnit.SECONDS);
-        if( stage == 1 ){
-           if( t >= delay ){
-               nextStage();
-           }
-        } else if( stage == 2 ) {
-            robot.mecanumDrive(0.15*0.7, -0.5*0.7, 0);
-            // 0.3, -1, 0, 1 second
-            if (t > timeOfNewStage + 3) {
-                nextStage();
-            }
-        }else if( stage == 3 ) {
-            robot.hardBrake();
-            robot.foundationControls(false );
-            // drop to 2 seconds
-            if (t > timeOfNewStage + 1) {
-                nextStage();
-            }
-        }else if( stage == 4 ) {
-            robot.foundationControls(false );
-            robot.mecanumDrive(0, 0.6*0.7, 0);
-            // 0, 1, 0, 2
-            if (t > timeOfNewStage + 3) {
-                nextStage();
-            }
-        }else if( stage == 5 ){
-                double error = Math.toDegrees(robot.yaw())-90;
-                if( Math.abs(error) < 15 ){
-                    nextStage();
-                }else{
-                    robot.mecanumDrive(0,0,error*-0.075);
-                }
-        }else if( stage == 6 ) {
-                double error = Math.toDegrees(robot.yaw())-90;
-                robot.foundationControls(true );
-                robot.mecanumDrive(0,-0.1,error*-0.075);
-                // 0, -0.2, error*0.075, 2 second
-                if (t > timeOfNewStage + 3) {
-                   nextStage();
-                }
-        }else if( stage == 7 ){
-            robot.foundationControls(true);
-            robot.mecanumDriveFieldOrient( 0,0.5,0 );
-            if (t > timeOfNewStage + 2) {
-                nextStage();
-            }
-        }else if( stage == 8 ) {
-            //robot.levelArm();
-            robot.foundationControls(true);
-            robot.odometryY.setPower(-1);
-            if (t > timeOfNewStage + 2) {
-                nextStage();
-            }
-        }else{
-            robot.odometryY.setPower(0);
-            robot.mecanumDrive(0,0,0);
-        }
-        //telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
+        robot.mecanumDrive( out[0], out[1], out[2] );
+
+                //telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
+        telemetry.addData( "At Target", totalDone );
+        telemetry.addData( "Dones", dones[0] + " " + dones[1] + " " + dones[2] );
+        telemetry.addData( "Odo X", error[0] );
+        telemetry.addData( "Out X", error[0] * (10/8096) );
+        telemetry.addData( "Odo Y", error[1] );
+        telemetry.addData( "Out Y", error[0] * (-10/8096) );
         telemetry.addData( "Yaw", Math.toDegrees( robot.yaw() ) );
+        telemetry.addData( "Out G", error[0] * (0.075) );
         telemetry.update();
     }
 

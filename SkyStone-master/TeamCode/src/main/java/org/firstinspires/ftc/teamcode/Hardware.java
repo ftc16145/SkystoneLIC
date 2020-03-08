@@ -61,40 +61,30 @@ Fortnite!
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣶⣿
 * */
 public class Hardware {
-    // Constants
-        // Height of pivot above ground
-            double hP = 12;
-        // Min size of arm
-            double dP = 7;
-        // Radius of back part of arm
-            double rB = 10;
-        // Radius of spool wheel
-            double rS = 7/16;
-        // Radius of gear
-            double rG = 3/4;
-
 
     // Timer
         private ElapsedTime runtime = new ElapsedTime();
-    // Is this updating?
     // Scoring Mechanisms
         public DcMotorEx leftFront, leftBack, rightFront, rightBack;
         public ArrayList<DcMotorEx> drivetrain = new ArrayList<DcMotorEx>();
-        public DcMotorEx slide = null;
-        public DcMotorEx claw = null;
-        public DcMotorEx arm = null;
-        public DcMotorEx autoGrab = null;
         double prevXPower, prevYPower;
-        public ArrayList<DcMotorEx> scoring = new ArrayList<DcMotorEx>();
 
-        public CRServo found = null;
+        public DcMotorEx odometryX, odometryY;
+
+        public Servo found = null;
         public Servo cap = null;
-        public ColorSensor color = null;
-        public DistanceSensor distance = null;
+
+        public DcMotorEx armA, armB;
+        public Servo clawA, clawB;
+
+        public ColorSensor lineColor, colorA, colorB;
+
+
         public BNO055IMU imu = null;
 
         double targetAng = 0;
-
+        boolean lastHit = true;
+        boolean firstCall = true;
     // Info for the class
         HardwareMap hwMap = null;
         Telemetry tel = null;
@@ -118,7 +108,7 @@ public class Hardware {
 
 
 
-            Context myApp;
+        Context myApp;
 
 
 
@@ -126,9 +116,9 @@ public class Hardware {
         String sounds[] = {"ss_alarm", "ss_bb8_down", "ss_bb8_up", "ss_darth_vader", "ss_fly_by",
             "ss_mf_fail", "ss_laser", "ss_laser_burst", "ss_light_saber", "ss_light_saber_long", "ss_light_saber_short",
             "ss_light_speed", "ss_mine", "ss_power_up", "ss_r2d2_up", "ss_roger_roger", "ss_siren", "ss_wookie"};
-            boolean soundPlaying = false;
-            int soundIndex, soundID;
-            SoundPlayer.PlaySoundParams params;
+        boolean soundPlaying = false;
+        int soundIndex, soundID;
+        SoundPlayer.PlaySoundParams params;
 
 
 
@@ -163,12 +153,6 @@ public class Hardware {
         setDriveModes( r );
     }
 
-    public void setScoreModes( DcMotorEx.RunMode r ){
-        for( DcMotorEx m : scoring ){
-            m.setMode( r );
-        }
-    }
-
     public void init( HardwareMap hardware, Telemetry atel ){
         hwMap = hardware;
         tel = atel;
@@ -188,31 +172,38 @@ public class Hardware {
             m.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
             m.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
         }
-        claw = hwMap.get(DcMotorEx.class, "claw");
-        slide = hwMap.get(DcMotorEx.class, "slide");
-        arm = hwMap.get(DcMotorEx.class, "arm");
-        autoGrab = hwMap.get(DcMotorEx.class,"grab");
-        scoring.add(claw);
-        scoring.add(slide);
-        scoring.add(arm);
-        scoring.add(autoGrab);
-        for( DcMotorEx m : scoring ){
-            m.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            m.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            m.setTargetPosition(0);
-            m.setPower(0);
-            m.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            m.setPositionPIDFCoefficients(10);
-            m.setTargetPositionTolerance(5);
-        }
 
-        found = hwMap.get( CRServo.class, "foundation" );
+        odometryX = hwMap.get( DcMotorEx.class, "odomX" );
+        odometryY = hwMap.get( DcMotorEx.class, "odomY/Tape" );
+
+        odometryX.setMode( DcMotorEx.RunMode.STOP_AND_RESET_ENCODER );
+        odometryX.setMode( DcMotorEx.RunMode.RUN_WITHOUT_ENCODER );
+
+        odometryY.setMode( DcMotorEx.RunMode.STOP_AND_RESET_ENCODER );
+        odometryY.setMode( DcMotorEx.RunMode.RUN_WITHOUT_ENCODER );
+        odometryY.setDirection( DcMotorEx.Direction.REVERSE );
+
+        found = hwMap.get( Servo.class, "foundation" );
+        found.setDirection(Servo.Direction.REVERSE);
         cap = hwMap.get( Servo.class, "cap");
+
+        armA = hwMap.get( DcMotorEx.class, "armA" );
+        armA.setDirection(DcMotorEx.Direction.REVERSE);
+        armB = hwMap.get( DcMotorEx.class, "armB" );
+//        armC = hwMap.get( DcMotorEx.class, "armC" );
+
+        clawA = hwMap.get( Servo.class, "clawA" );
+        clawB = hwMap.get( Servo.class, "clawB" );
+        clawB.setDirection(Servo.Direction.REVERSE);
+//        clawC = hwMap.get( Servo.class, "clawC" );
 
         cap.setDirection(Servo.Direction.REVERSE);
 
-        color = hwMap.get( ColorSensor.class, "color" );
-        distance = hwMap.get( DistanceSensor.class, "color" );
+        lineColor = hwMap.get( ColorSensor.class, "color" );
+
+        colorA = hwMap.get( ColorSensor.class, "senseA" );
+        colorB = hwMap.get( ColorSensor.class, "senseB" );
+
 
         BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
         parameters.angleUnit           = BNO055IMU.AngleUnit.RADIANS;
@@ -245,26 +236,26 @@ public class Hardware {
     }
 
     public double yaw(){
-        return imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS).firstAngle;
+        return imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYZ, AngleUnit.RADIANS).secondAngle;
     }
-
     public void hardBrake(){
         setMotorPowers(0,0,0,0);
     }
 
+
     public void mecanumDrive(double x, double y, double rot) {
         double nX, nY;
         // Updated from 0.1 to 0.2, testing to amp up accel
-        nX = (Math.abs(x - prevXPower) > 0.2) ? prevXPower + Math.signum(x - prevXPower) * 0.2 : x;
-        nY = (Math.abs(y - prevYPower) > 0.2) ? prevYPower + Math.signum(y - prevYPower) * 0.2 : y;
+        nX = (Math.abs(x - prevXPower) > 0.25) ? prevXPower + Math.signum(x - prevXPower) * 0.25 : x;
+        nY = (Math.abs(y - prevYPower) > 0.25) ? prevYPower + Math.signum(y - prevYPower) * 0.25 : y;
 
         double r = Math.hypot(-nX, nY);
         double robotAngle = Math.atan2(nY, -nX) - Math.PI / 4;
         double rightX = rot;
-        double v1 = r * Math.cos(robotAngle) - rightX;
-        double v2 = r * Math.sin(robotAngle) - rightX;
-        double v3 = r * Math.sin(robotAngle) + rightX;
-        double v4 = r * Math.cos(robotAngle) + rightX;
+        double v1 = r * Math.cos(robotAngle);
+        double v2 = r * Math.sin(robotAngle);
+        double v3 = r * Math.sin(robotAngle);
+        double v4 = r * Math.cos(robotAngle);
         double[] vals = {v1,v2,v3,v4};
 
         // Calculate maximum out of the 4 values
@@ -279,12 +270,16 @@ public class Hardware {
         // Set all values to at most 1, mult by r to account for the magnitude input
 
         // Might need to make these deadbands instead of a hard zero
-        if( max != 0 && r != 0 ){
-            v1 = ( v1 / max ) * r;
-            v2 = ( v2 / max ) * r;
-            v3 = ( v3 / max ) * r;
-            v4 = ( v4 / max ) * r;
+        if( max != 0 ){
+            v1 = ( ( v1 / max ) * r );
+            v2 = ( ( v2 / max ) * r );
+            v3 = ( ( v3 / max ) * r );
+            v4 = ( ( v4 / max ) * r );
         }
+        v1 -= rightX;
+        v2 -= rightX;
+        v3 += rightX;
+        v4 += rightX;
         setMotorPowers(v1,v2,v3,v4);
         // NOW: leftFront, leftBack, rightFront, rightBack
         prevXPower = nX;
@@ -303,160 +298,22 @@ public class Hardware {
         mecanumDriveFieldOrient( x, y, rot, 0 );
     }
 
-    public enum Direction{
-        kForward,kLeft,kRight,kReverse
-    }
-
-    public void driveDirection( Direction d, double inches, double power ){
-        double encoder = inches/(4*Math.PI)*1120;
-        switch( d ){
-            case kForward:
-                for( DcMotorEx m : drivetrain ){
-                    m.setTargetPosition( (int) -encoder );
-                }
-                break;
-            case kReverse:
-                for( DcMotorEx m : drivetrain ){
-                    m.setTargetPosition( (int) encoder );
-                }
-                break;
-            case kLeft:
-                leftFront.setTargetPosition( (int) encoder );
-                leftBack.setTargetPosition( (int) -encoder );
-                rightFront.setTargetPosition( (int) -encoder );
-                rightBack.setTargetPosition( (int) encoder );
-                break;
-            case kRight:
-                leftFront.setTargetPosition( (int) -encoder );
-                leftBack.setTargetPosition( (int) encoder );
-                rightFront.setTargetPosition( (int) encoder );
-                rightBack.setTargetPosition( (int) -encoder );
-                break;
+    public void foundationControls( boolean up, boolean down ) {
+        if( down ){
+            lastHit = false;
+        }else if( up ){
+            lastHit = true;
         }
-        if( isAtDriveTarget() ){
-            hardBrake();
-        }else {
-            mecanumDrive(0, power, 0);
-        }
+        found.setPosition( lastHit ? 0 : 1 );
     }
 
-    public boolean isAtDriveTarget(){
-        return Math.abs(leftFront.getCurrentPosition() - leftFront.getTargetPosition()) < 50;
+    public void foundationControls( boolean up ){
+        lastHit = up;
+        found.setPosition( lastHit ? 0 : 1 );
     }
 
-    public void rotateDrive( double ang, double power ){
-        if( isAtRotateTarget( ang ) ) {
-            hardBrake();
-        }else{
-            mecanumDrive(0, 0, (Math.toDegrees(yaw()) - ang) * 0.075 * power);
-        }
-    }
 
-    public boolean isAtRotateTarget( double target ){
-        return Math.abs( Math.toDegrees( yaw() ) - target ) <= 15;
-    }
 
-    public void foundationControls(boolean forward, boolean backward) {
-        if (forward) {
-            found.setDirection(DcMotor.Direction.FORWARD);
-            found.setPower(1);
-            playSound("ss_wookie");
-        } else if (backward) {
-            found.setDirection(DcMotor.Direction.REVERSE);
-            found.setPower(1);
-            playSound("ss_roger_roger");
-        } else {
-            found.setPower(0);
-        }
-    }
-
-    public void spoolControl( boolean up, boolean down ){
-        if (up) {
-            arm.setPower(-0.75);
-        } else if (down) {
-            arm.setPower(0.75);
-        } else {
-            arm.setPower(0);
-        }
-    }
-
-    public void spoolControl( double power ){
-        arm.setPower( power );
-    }
-
-    public void clawControl( boolean open, boolean close ){
-        if (open) {
-            clawControl(0.8);
-        } else if (close) {
-            clawControl(-0.8);
-        } else {
-            clawControl(0);
-        }
-    }
-
-    public void clawControl( double power ){
-        claw.setPower( power );
-    }
-
-    public void slideControl( boolean out, boolean in ){
-        if (out) {
-            slideControl(0.8);
-        } else if (in) {
-            slideControl(-0.8);
-        } else {
-            slideControl(0);
-        }
-    }
-
-    public void slideControl( double power ){
-        slide.setPower( power );
-    }
-
-    public void armMechanismControls(boolean clawOpen, boolean clawClose, boolean armUp, boolean armDown, double slideControl) {
-        clawControl( clawOpen, clawClose );
-        spoolControl( armUp, armDown );
-        slideControl( slideControl );
-    }
-
-    public void setSideGrab( boolean open ){
-        autoGrab.setTargetPosition( open ? 0 : 144 );
-        autoGrab.setPower(1);
-    }
-
-    // NOT DONE, NEEDS VALUES, MAX
-    public void setArmPosition( double x, double y ){
-        double angle, rExpand;
-        if( y == 0 && x == 0){
-            angle = Math.atan( ( 5-hP ) / 19 );
-            rExpand = (19 / Math.cos( angle ))-dP;
-        }else{
-            angle = Math.atan( ( 5*y + 2.25 - hP ) / ( 14.8 + 4*x ) );
-            rExpand = ((14.8 + 4*x) / Math.cos( angle )) - dP;
-        }
-        double armWind = ((rB*Math.sin(-angle))/(2*Math.PI*rS))*288;
-        double armExt = rExpand / (2*rG*Math.PI) * 288;
-        // Fix ArmWInd
-            slide.setTargetPosition((int) armExt);
-            slide.setPower(0.8);
-            arm.setTargetPosition((int) armWind);
-            arm.setPower(0.8);
-
-    }
-
-    public void levelArm(){
-        arm.setTargetPosition(0);
-        arm.setPower(1);
-        // Old value 630
-        if( slide.getCurrentPosition() < 630 ){
-            slide.setTargetPosition( 630 );
-            slide.setPower( 0.5 );
-        }
-    }
-
-    public void operateClaw(boolean open){
-        claw.setTargetPosition(open ? -240 : 0);
-        claw.setPower(0.8);
-    }
 
 
 

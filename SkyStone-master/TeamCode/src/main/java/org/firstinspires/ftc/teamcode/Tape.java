@@ -27,14 +27,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode.TeleOp;
+package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.teamcode.Hardware;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -50,13 +49,16 @@ import org.firstinspires.ftc.teamcode.Hardware;
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
-@TeleOp(name="Field Drive R", group="Mecanum")
+@Autonomous(name="Tape Only", group="Red")
 
-public class FieldMeccRight extends OpMode
-{
-    // Declare OpMode members.
+public class Tape extends OpMode
+{// Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
     private Hardware robot = new Hardware();
+    boolean rotated = false;
+    int delay = 0;
+    int stage = 1;
+    double timeOfNewStage;
     //private DcMotor leftFront, leftBack, rightFront, rightBack, slide, claw, arm;
     //SLIDE MOTOR
     // 1120 Ticks/rev
@@ -69,17 +71,22 @@ public class FieldMeccRight extends OpMode
     //private CRServo found;
 
 
-    //public Drivetrain drive;
 
+
+    //public Drivetrain drive;
+    private void nextStage(){
+        stage++;
+        timeOfNewStage = runtime.time(TimeUnit.SECONDS);
+        robot.setMotorPowers(0,0,0,0);
+    }
     /*
      * Code to run ONCE when the driver hits INIT
      */
     @Override
     public void init() {
         robot.init( hardwareMap, telemetry );
-        robot.setScoreModes( DcMotorEx.RunMode.RUN_USING_ENCODER );
+        telemetry.addData("Status", "Initialized" );
 
-        telemetry.addData("Status", "Initialized");
 
         // create a sound parameter that holds the desired player parameters.
 
@@ -93,7 +100,6 @@ public class FieldMeccRight extends OpMode
         //drive = Drivetrain.init( 0, 0, 0, Drivetrain.driveType.fourWheel );
 
         // Tell the driver that initialization is complete.
-        telemetry.addData("Status", "Initialized" );
 
         //gyro = hardwareMap.get( GyroSensor.class, "gyro" );
         //gyro.calibrate();
@@ -106,8 +112,7 @@ public class FieldMeccRight extends OpMode
      */
     @Override
     public void init_loop() {
-
-        //robot.visionTeleop();
+        robot.initLoop();
     }
 
     /*
@@ -116,34 +121,26 @@ public class FieldMeccRight extends OpMode
     @Override
     public void start() {
         runtime.reset();
-        //robot.autoGrab.setMode( DcMotorEx.RunMode.RUN_TO_POSITION );
-        robot.autoGrab.setMode( DcMotorEx.RunMode.RUN_USING_ENCODER );
+
     }
     /*
      * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
      */
     @Override
     public void loop() {
-        robot.mecanumDriveFieldOrient( gamepad1.left_stick_x, gamepad1.left_stick_y, gamepad1.right_stick_x, -90 );
-        robot.foundationControls( gamepad2.dpad_down, gamepad2.dpad_up );
-        robot.armMechanismControls( gamepad2.right_bumper, gamepad2.right_trigger >= 0.5, gamepad2.left_bumper, gamepad2.left_trigger >= 0.5, gamepad2.y ? 0.5 : gamepad2.a ? -0.5 : 0 );
-        if( gamepad2.dpad_right ){
-            robot.autoGrab.setPower(0.75);
-        }else if( gamepad2.dpad_left ){
-            robot.autoGrab.setPower(-0.75);
-        }else{
-            robot.autoGrab.setPower(0);
-        }
-        robot.cap.setPosition( Math.abs( gamepad2.left_stick_y ) );
-        //robot.cap.setPosition( 1-Math.abs( gamepad2.left_stick_y ) );
+        // First, rotate the  robot to be parallel to the face of the block
 
-        telemetry.addData("RGB",robot.color.red() + " " + robot.color.green() + " " + robot.color.blue() );
-        telemetry.addData("Gyro",robot.yaw() );
-        telemetry.addData( "X Y", gamepad1.left_stick_x + " " + gamepad1.left_stick_y );
-        telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
-        telemetry.addData("Status", "Run Time: " + runtime.toString() );
+        double t = runtime.time(TimeUnit.SECONDS);
+        if( t <= 2 ){
+            robot.odometryY.setPower(-1);
+        }else{
+            robot.odometryY.setPower( 0 );
+        }
+        //telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
+        telemetry.addData( "Yaw", Math.toDegrees( robot.yaw() ) );
         telemetry.update();
     }
+
 
     /*
      * Code to run ONCE after the driver hits STOP
@@ -151,8 +148,6 @@ public class FieldMeccRight extends OpMode
     @Override
     public void stop() {
 
-        //playSound("ss_alarm");
-        //  drive.stop();
     }
 
 }

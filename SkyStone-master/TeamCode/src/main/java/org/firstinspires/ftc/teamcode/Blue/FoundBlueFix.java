@@ -145,43 +145,44 @@ public class FoundBlueFix extends OpMode
             }
         }else if( stage == 3 ) {
             robot.hardBrake();
-            robot.foundationControls(false, true);
-            if (t > timeOfNewStage + 3) {
+            robot.foundationControls(false );
+            if (t > timeOfNewStage + 1) {
                 nextStage();
             }
         }else if( stage == 4 ) {
-            robot.foundationControls(false, true);
             robot.mecanumDrive(0, 0.6*0.7, 0);
             if (t > timeOfNewStage + 3) {
                 nextStage();
             }
         }else if( stage == 5 ){
-            double error = Math.toDegrees(robot.yaw())-90;
+            double error = Math.toDegrees(robot.yaw())+90;
             if( Math.abs(error) < 10 ){
                 nextStage();
             }else{
-                robot.mecanumDrive(0,0,error*0.075);
+                robot.mecanumDrive(0,0,error*-0.075);
             }
         }else if( stage == 6 ) {
-            double error = Math.toDegrees(robot.yaw())-90;
-            robot.foundationControls(true,false);
-            robot.mecanumDrive(0,-0.1,error*0.075);
+            double error = Math.toDegrees(robot.yaw())+90;
+            robot.foundationControls(true );
+            robot.mecanumDrive(0,-0.1,error*-0.075);
             if (t > timeOfNewStage + 3) {
                 nextStage();
             }
         }else if( stage == 7 ){
-            robot.levelArm();
-            robot.foundationControls(false,false);
-            robot.mecanumDriveFieldOrient(0.4,0,0);
-            if (t > timeOfNewStage + 4 || robot.color.blue() > 400) {
+            robot.foundationControls(true);
+            robot.mecanumDriveFieldOrient( 0,0.5,0 );
+            if (t > timeOfNewStage + 2) {
                 nextStage();
             }
-        }else if( stage == 8 ){
-            robot.mecanumDriveFieldOrient(0,0.4,0 );
-            if( t > timeOfNewStage + 3 ){
+        }else if( stage == 8 ) {
+            //robot.levelArm();
+            robot.foundationControls(true);
+            robot.odometryY.setPower(-1);
+            if (t > timeOfNewStage + 2) {
                 nextStage();
             }
         }else{
+            robot.odometryY.setPower(0);
             robot.mecanumDrive(0,0,0);
         }
         telemetry.addData( "Yaw", Math.toDegrees(robot.yaw()) );

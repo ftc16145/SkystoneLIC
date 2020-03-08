@@ -140,9 +140,9 @@ boolean done;
     public void loop() {
         // Just move forward. That's it.
        if( runtime.time(TimeUnit.SECONDS) > 5 && !done){
-           robot.levelArm();
+           //robot.levelArm();
            robot.mecanumDrive(0,-0.4,0);
-           if( robot.color.red() > 400 || runtime.time(TimeUnit.SECONDS) > 8 ){
+           if( robot.lineColor.red() > 400 ){
                done = true;
            }
        }else{

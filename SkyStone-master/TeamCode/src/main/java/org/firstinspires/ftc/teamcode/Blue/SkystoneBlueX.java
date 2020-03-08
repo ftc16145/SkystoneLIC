@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode.Red;
+package org.firstinspires.ftc.teamcode.Blue;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -35,6 +35,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.Hardware;
+import org.firstinspires.ftc.teamcode.MecanumCalculator;
 
 import java.util.concurrent.TimeUnit;
 
@@ -52,16 +53,18 @@ import java.util.concurrent.TimeUnit;
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Found Red Rot", group="Red")
+@Autonomous(name="Skystone Blue Simple X", group="Blue")
 
-public class FoundRedFix extends OpMode
+public class SkystoneBlueX extends OpMode
 {// Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
     private Hardware robot = new Hardware();
     boolean rotated = false;
     int delay = 0;
     int stage = 1;
+    int pos = 0;
     double timeOfNewStage;
+    MecanumCalculator calculator = new MecanumCalculator( 0.000125, 0.00025, 2 );
     //private DcMotor leftFront, leftBack, rightFront, rightBack, slide, claw, arm;
     //SLIDE MOTOR
     // 1120 Ticks/rev
@@ -80,6 +83,10 @@ public class FoundRedFix extends OpMode
     private void nextStage(){
         stage++;
         timeOfNewStage = runtime.time(TimeUnit.SECONDS);
+        robot.odometryY.setMode( DcMotorEx.RunMode.STOP_AND_RESET_ENCODER );
+        robot.odometryX.setMode( DcMotorEx.RunMode.STOP_AND_RESET_ENCODER );
+        robot.odometryY.setMode( DcMotorEx.RunMode.RUN_WITHOUT_ENCODER );
+        robot.odometryX.setMode( DcMotorEx.RunMode.RUN_WITHOUT_ENCODER );
         robot.setMotorPowers(0,0,0,0);
     }
     /*
@@ -135,62 +142,110 @@ public class FoundRedFix extends OpMode
 
         double t = runtime.time(TimeUnit.SECONDS);
         if( stage == 1 ){
-           if( t >= delay ){
-               nextStage();
-           }
-        } else if( stage == 2 ) {
-            robot.mecanumDrive(0.15*0.7, -0.5*0.7, 0);
-            // 0.3, -1, 0, 1 second
-            if (t > timeOfNewStage + 3) {
+            if( t < timeOfNewStage + 2 ){
+                robot.armA.setPower( 0.50 );
+                robot.armB.setPower( 0.50 );
+            }else{
+                robot.armA.setPower( 0 );
+                robot.armB.setPower( 0 );
+            }
+            robot.clawA.setPosition( 0 );
+            robot.clawB.setPosition( 0 );
+            calculator.setTarget( -22500,0,0 );
+            double[] out = calculator.getOutput( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+            robot.mecanumDrive( out[0], out[1], out[2] );
+            if( calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() ) ){
                 nextStage();
             }
-        }else if( stage == 3 ) {
-            robot.hardBrake();
-            robot.foundationControls(false );
-            // drop to 2 seconds
-            if (t > timeOfNewStage + 1) {
+        }else if( stage == 2 ){
+            if( robot.colorA.green() < 15 ){
+                pos = 1;
+            }else{
+                pos = 3;
+            }
+            if( t > timeOfNewStage + 2 ){
                 nextStage();
             }
-        }else if( stage == 4 ) {
-            robot.foundationControls(false );
-            robot.mecanumDrive(0, 0.6*0.7, 0);
-            // 0, 1, 0, 2
-            if (t > timeOfNewStage + 3) {
+        }else if( stage == 3 ){
+            if( pos == 1 ){
+                robot.clawA.setPosition(1);
+                robot.mecanumDrive(-0.2,0,0);
+                if( t > timeOfNewStage + 1 ){
+                    nextStage();
+                }
+            }else if( pos == 2 ){
+                calculator.setTarget( 0,6872,0 );
+                calculator.setP(  0.0002, 0.0002, 2 );
+                // calculator.setP( 0.0002, 0.004, 2 );
+                double[] out = calculator.getOutput( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+                robot.mecanumDrive( out[0], out[1], out[2] );
+                if( calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() ) ){
+                    nextStage();
+                }
+            }else if( pos == 3 ){
+                robot.clawB.setPosition(1);
+                robot.mecanumDrive(-0.2,0,0);
+                if( t > timeOfNewStage + 1 ){
+                    nextStage();
+                }
+            }
+        }else if( stage == 4 ){
+            if( pos == 1 ){
+                nextStage();
+            }else if( pos == 2 ){
+                robot.clawB.setPosition(1);
+                if( t > timeOfNewStage + 1 ){
+                    nextStage();
+                }
+            }else if( pos == 3 ){
                 nextStage();
             }
         }else if( stage == 5 ){
-                double error = Math.toDegrees(robot.yaw())-90;
-                if( Math.abs(error) < 15 ){
-                    nextStage();
-                }else{
-                    robot.mecanumDrive(0,0,error*-0.075);
-                }
-        }else if( stage == 6 ) {
-                double error = Math.toDegrees(robot.yaw())-90;
-                robot.foundationControls(true );
-                robot.mecanumDrive(0,-0.1,error*-0.075);
-                // 0, -0.2, error*0.075, 2 second
-                if (t > timeOfNewStage + 3) {
-                   nextStage();
-                }
+            // Back up
+            calculator.setP( 0.0001, 0.0005, 2 );
+            calculator.setTarget( 8600,0,0 );
+            double[] out = calculator.getOutput( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+            robot.mecanumDrive( out[0], out[1], out[2] );
+            if( calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() ) ){
+                nextStage();
+            }
+        }else if( stage == 6 ){
+            // Go across
+            calculator.setP(  0.000125, 0.0001, 2 );
+            // 50000
+            calculator.setTarget( 0,40000,0 );
+            double[] out = calculator.getOutput( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+            robot.mecanumDrive( out[0], out[1], out[2] );
+            if( calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() ) ){
+                robot.clawA.setPosition( 0 );
+                robot.clawB.setPosition( 0 );
+                nextStage();
+            }
         }else if( stage == 7 ){
-            robot.foundationControls(true);
-            robot.mecanumDriveFieldOrient( 0,0.5,0 );
-            if (t > timeOfNewStage + 2) {
+            // Go across
+            calculator.setP(  0.004, 0.0001, 2 );
+            // 50000
+            calculator.setTarget( 0,-16000,0 );
+            double[] out = calculator.getOutput( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+            robot.mecanumDrive( out[0], out[1], out[2] );
+            if( calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() ) ){
+                robot.clawA.setPosition( 0 );
+                robot.clawB.setPosition( 0 );
                 nextStage();
             }
-        }else if( stage == 8 ) {
-            //robot.levelArm();
-            robot.foundationControls(true);
-            robot.odometryY.setPower(-1);
-            if (t > timeOfNewStage + 2) {
-                nextStage();
-            }
-        }else{
-            robot.odometryY.setPower(0);
-            robot.mecanumDrive(0,0,0);
         }
+        double[] error = calculator.getError( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+        boolean[] dones = calculator.getDoneIndiv( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
+        boolean totalDone = calculator.getDoneOverall( robot.odometryX.getCurrentPosition(), robot.odometryY.getCurrentPosition(), robot.yaw() );
         //telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
+        telemetry.addData("Stage", stage );
+        telemetry.addData( "SenseA", robot.colorA.green() );
+        telemetry.addData( "SenseB", robot.colorB.green() );
+        telemetry.addData( "Pos", pos );
+        telemetry.addData( "At Target", totalDone );
+        telemetry.addData( "Dones", dones[0] + " " + dones[1] + " " + dones[2] );
+        telemetry.addData( "Odo X", error[0] );
+        telemetry.addData( "Odo Y", error[1] );
         telemetry.addData( "Yaw", Math.toDegrees( robot.yaw() ) );
         telemetry.update();
     }

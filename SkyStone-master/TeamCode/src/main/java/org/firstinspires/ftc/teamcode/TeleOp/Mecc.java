@@ -29,12 +29,18 @@
 
 package org.firstinspires.ftc.teamcode.TeleOp;
 
+import android.sax.TextElementListener;
+
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.robotcore.external.navigation.Acceleration;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.teamcode.Hardware;
 
 /**
@@ -58,6 +64,9 @@ public class Mecc extends OpMode
     // Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
     private Hardware robot = new Hardware();
+    boolean lastHit = true;
+    boolean prevY = false;
+    boolean close = false;
     //private DcMotor leftFront, leftBack, rightFront, rightBack, slide, claw, arm;
     //SLIDE MOTOR
     // 1120 Ticks/rev
@@ -78,8 +87,7 @@ public class Mecc extends OpMode
     @Override
     public void init() {
         robot.init( hardwareMap, telemetry );
-        robot.setScoreModes( DcMotorEx.RunMode.RUN_USING_ENCODER );
-
+        //robot.setScoreModes( DcMotorEx.RunMode.RUN_USING_ENCODER );
         telemetry.addData("Status", "Initialized");
 
         // create a sound parameter that holds the desired player parameters.
@@ -117,8 +125,7 @@ public class Mecc extends OpMode
     @Override
     public void start() {
         runtime.reset();
-        //robot.autoGrab.setMode( DcMotorEx.RunMode.RUN_TO_POSITION );
-        robot.autoGrab.setMode( DcMotorEx.RunMode.RUN_USING_ENCODER );
+
     }
     /*
      * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
@@ -126,22 +133,48 @@ public class Mecc extends OpMode
     @Override
     public void loop() {
         robot.mecanumDrive( gamepad1.left_stick_x, gamepad1.left_stick_y, gamepad1.right_stick_x );
+        //robot.foundationControls( gamepad2.dpad_down, gamepad2.dpad_up );
         robot.foundationControls( gamepad2.dpad_down, gamepad2.dpad_up );
-        robot.armMechanismControls( gamepad2.right_bumper, gamepad2.right_trigger >= 0.5, gamepad2.left_bumper, gamepad2.left_trigger >= 0.5, gamepad2.y ? 0.5 : gamepad2.a ? -0.5 : 0 );
-        if( gamepad2.dpad_right ){
-            robot.autoGrab.setPower(0.75);
-        }else if( gamepad2.dpad_left ){
-            robot.autoGrab.setPower(-0.75);
-        }else{
-            robot.autoGrab.setPower(0);
-        }
-        robot.cap.setPosition( Math.abs( gamepad2.left_stick_y ) );
-        //robot.cap.setPosition( 1-Math.abs( gamepad2.left_stick_y ) );
+        //robot.armMechanismControls( gamepad2.right_bumper, gamepad2.right_trigger >= 0.5, gamepad2.left_bumper, gamepad2.left_trigger >= 0.5, gamepad2.y ? 0.5 : gamepad2.a ? -0.5 : 0 );
 
-        telemetry.addData("RGB",robot.color.red() + " " + robot.color.green() + " " + robot.color.blue() );
-        telemetry.addData("Gyro",robot.yaw() );
-        telemetry.addData( "X Y", gamepad1.left_stick_x + " " + gamepad1.left_stick_y );
-        telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
+        if( gamepad2.right_trigger > 0.5 ){
+            robot.armA.setPower( 0.5 );
+        }else if( gamepad2.right_bumper ){
+            robot.armA.setPower( -0.5 );
+        }else{
+            robot.armA.setPower( 0 );
+        }
+
+        if( gamepad2.left_trigger > 0.5 ){
+            robot.armB.setPower( 0.5 );
+        }else if( gamepad2.left_bumper ){
+            robot.armB.setPower( -0.5 );
+        }else{
+            robot.armB.setPower( 0 );
+        }
+
+        if( gamepad2.y && !prevY ){
+            prevY = true;
+            close = !close;
+        }
+        if( !gamepad2.y ){
+            prevY = false;
+        }
+
+        robot.clawA.setPosition( close ? 0 : 1 );
+        robot.clawB.setPosition( close ? 0 : 1 );
+
+        robot.odometryY.setPower( gamepad2.right_stick_y );
+        robot.cap.setPosition( Math.abs( gamepad2.left_stick_y ) );
+
+        telemetry.addData("RGB F",robot.lineColor.red() + " " + robot.lineColor.green() + " " + robot.lineColor.blue() );
+        telemetry.addData("RGB A",robot.colorA.red() + " " + robot.colorA.green() + " " + robot.colorA.blue() );
+        telemetry.addData("RGB B",robot.colorB.red() + " " + robot.colorB.green() + " " + robot.colorB.blue() );
+        telemetry.addData("Yaw",robot.yaw() );
+        //telemetry.addData( "X Y", gamepad1.left_stick_x + " " + gamepad1.left_stick_y );
+        telemetry.addData( "Odo X", robot.odometryX.getCurrentPosition() );
+        telemetry.addData( "Odo Y", robot.odometryY.getCurrentPosition() );
+        //telemetry.addData("Slide Enc",robot.slide.getCurrentPosition() );
         telemetry.addData("Status", "Run Time: " + runtime.toString() );
         telemetry.update();
     }
